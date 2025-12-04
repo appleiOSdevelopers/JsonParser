@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>QuickType-like — JSON → Swift / Kotlin / Java (Full)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0f14;
+    --panel:#0f1620;
+    --muted:#9aa5b1;
+    --accent:#00e676;
+    --glass: rgba(255,255,255,0.03);
+    --card: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  body{background: radial-gradient(800px 400px at 10% 10%, rgba(0,120,255,0.06), transparent),
+                 radial-gradient(700px 350px at 90% 90%, rgba(144,19,254,0.06), transparent),
+                 var(--bg); color:#e6eef6; display:flex; gap:24px; padding:28px; box-sizing:border-box;}
+  .app{display:grid; grid-template-columns: 430px 1fr; gap:22px; width:100%; max-width:1400px; margin:auto;}
+  .card{background:var(--panel); border-radius:14px; padding:18px; box-shadow: 0 8px 40px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.03);}
+  .left{display:flex; flex-direction:column; gap:12px;}
+  .heading{display:flex; align-items:center; gap:12px;}
+  .logo{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,#00a3ff,#7a00ff);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;}
+  h1{margin:0;font-size:18px;}
+  .hint{color:var(--muted);font-size:13px;margin-top:2px;}
+  textarea#jsonInput{width:100%;min-height:420px;border-radius:10px;border:none;padding:14px;font-size:14px;background:var(--glass);color:#e6eef6;outline:1px solid rgba(255,255,255,0.02);resize:vertical;}
+  .controls{display:flex; gap:10px; align-items:center; margin-top:6px;}
+  select, input[type="checkbox"]{background:transparent;color:#e6eef6;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;font-size:13px;}
+  .btn{background:linear-gradient(90deg,#00b9ff,#7a00ff); color:white;border:none;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer;}
+  .small{font-size:13px;color:var(--muted);}
+  .right{display:flex;flex-direction:column; gap:12px;}
+  .tabs{display:flex; gap:8px; align-items:center;}
+  .tab{padding:10px 14px;border-radius:10px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,0.03);font-weight:600;color:var(--muted);}
+  .tab.active{background:rgba(0,0,0,0.4); color:var(--accent); border:1px solid rgba(0,230,118,0.12); box-shadow:0 6px 18px rgba(0,230,118,0.03);}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .panes{display:grid; grid-template-columns: 1fr 380px; gap:14px; margin-top:8px; align-items:start;}
+  .output{background:var(--card); border-radius:10px; padding:14px; min-height:520px; overflow:auto; color:#c8ffd4; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; border:1px solid rgba(255,255,255,0.02);}
+  .meta{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border-radius:10px; padding:12px; color:var(--muted); font-size:13px; height:520px; overflow:auto; border:1px solid rgba(255,255,255,0.02);}
+  .section-title{font-size:13px;color:var(--muted);margin-bottom:8px;}
+  .row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.03);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer;}
+  .copy{background:linear-gradient(90deg,#ff9a00,#ff3a7a);border:none;padding:8px 12px;border-radius:8px;color:white;cursor:pointer;}
+  .keys-list{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#bfeccf;white-space:pre-wrap;}
+  .badge{display:inline-block;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted);font-size:12px;margin-right:6px;}
+  footer{margin-top:12px;color:var(--muted);font-size:12px;}
+  /* responsive */
+  @media (max-width:980px){
+    .app{grid-template-columns:1fr; padding:14px}
+    .panes{grid-template-columns:1fr; }
+    textarea#jsonInput{min-height:260px}
+    .meta{height:auto}
+    .output{min-height:260px}
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="card left">
+      <div class="heading">
+        <div class="logo">QT</div>
+        <div>
+          <h1>QuickType-style — JSON → Models</h1>
+          <div class="hint">Paste example JSON below. Tool generates Swift, Kotlin, Java models with CodingKeys / SerializedName, enums & keys list.</div>
+        </div>
+      </div>
+
+      <textarea id="jsonInput" placeholder='Paste JSON here — e.g. {"status":true,"message":"ok","data":{"id":1,"name":"John"}}'></textarea>
+
+      <div class="controls">
+        <select id="rootName" title="Root model name">
+          <option value="Root">Root</option>
+          <option value="Response">Response</option>
+          <option value="Data">Data</option>
+        </select>
+
+        <select id="enumPolicy" title="Enum detection">
+          <option value="none">Enums: Off</option>
+          <option value="auto" selected>Enums: Auto (small unique sets)</option>
+          <option value="always">Enums: Force strings -> enum</option>
+        </select>
+
+        <label class="small" style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="optionalByDefault" /> Optional fields
+        </label>
+
+        <button class="btn" onclick="generate()">Generate</button>
+        <button class="btn-ghost" onclick="clearAll()">Clear</button>
+      </div>
+
+      <footer>Tip: supply a representative JSON sample (including array items & possible enum values) for best results.</footer>
+    </div>
+
+    <div class="card right">
+      <div class="toolbar">
+        <div class="tabs" role="tablist">
+          <div class="tab active" data-lang="swift" onclick="setTab(event,'swift')">Swift</div>
+          <div class="tab" data-lang="kotlin" onclick="setTab(event,'kotlin')">Kotlin</div>
+          <div class="tab" data-lang="java" onclick="setTab(event,'java')">Java</div>
+          <div class="tab" data-lang="typescript" onclick="setTab(event,'typescript')">TypeScript</div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="copy" onclick="copyCode()">Copy Code</button>
+          <button class="btn-ghost" onclick="downloadFile()">Download</button>
+        </div>
+      </div>
+
+      <div class="panes">
+        <pre id="codeOutput" class="output">Press Generate to create models from JSON.</pre>
+
+        <div class="meta">
+          <div class="section-title">🔧 Keys & Reference</div>
+          <div class="row"><span class="badge">Root</span><span id="metaRoot" class="small"></span></div>
+          <div class="section-title">🔑 All keys (nested)</div>
+          <div id="keys" class="keys-list">—</div>
+
+          <div style="height:12px"></div>
+          <div class="section-title">ℹ️ Detected types & enums</div>
+          <div id="types" class="small">—</div>
+
+          <div style="height:12px"></div>
+          <div class="section-title">⚙️ Options</div>
+          <div class="small">Enums policy: <span id="optEnum">auto</span></div>
+          <div class="small">Optional by default: <span id="optOptional">false</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  QuickType-like generator (client-side).
+  - Generates Swift (structs + CodingKeys + enums),
+             Kotlin (data classes + @SerializedName),
+             Java (POJOs + @SerializedName),
+             TypeScript interfaces (optional)
+  - Detects nested objects, arrays, simple enums (small unique sets of strings)
+  - Produces keys list and metadata
+  - Meant to be accurate for typical API JSON; not a full compiler-grade generator.
+*/
+
+const state = { lang: 'swift' };
+
+function setTab(e, lang){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  e.currentTarget.classList.add('active');
+  state.lang = lang;
+  generate();
+}
+
+function clearAll(){
+  document.getElementById('jsonInput').value = '';
+  document.getElementById('codeOutput').textContent = 'Press Generate to create models from JSON.';
+  document.getElementById('keys').textContent = '—';
+  document.getElementById('types').textContent = '—';
+}
+
+function copyCode(){
+  navigator.clipboard.writeText(document.getElementById('codeOutput').textContent).then(()=>alert('Copied to clipboard'));
+}
+
+function downloadFile(){
+  const code = document.getElementById('codeOutput').textContent;
+  const ext = state.lang === 'swift' ? 'swift' : state.lang === 'kotlin' ? 'kt' : state.lang === 'java' ? 'java' : 'ts';
+  const blob = new Blob([code], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `models.${ext}`; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ------------------ type helpers ------------------ */
+
+function isInteger(n){ return Number.isInteger(n); }
+function isFloat(n){ return typeof n === 'number' && !Number.isInteger(n); }
+function capitalize(s){ if(!s) return s; return s.charAt(0).toUpperCase() + s.slice(1); }
+function camelize(s){ return s.replace(/[_\-\s]+(.)?/g,(m,c)=>c?c.toUpperCase():''); }
+function validIdentifier(s){ return /^[a-zA-Z_]\w*$/.test(s);}
+
+/* Walk JSON and collect schema info */
+function analyzeJSON(value, name='Root', ctx=null){
+  ctx = ctx || { types: {}, enums: {}, nodes: {}, keys: [] };
+  function walk(v, path){
+    if(path) ctx.keys.push(path);
+    if(v === null) {
+      registerType(path, 'null');
+      return 'null';
+    }
+    if(Array.isArray(v)){
+      // empty array
+      if(v.length === 0){ registerType(path, 'array[]'); return 'array[]'; }
+      // analyze first few items (up to 5) to infer union/enum
+      const sample = v.slice(0,5);
+      const types = new Set(sample.map(item => detectPrimitive(item)));
+      if(types.size === 1){
+        const t = [...types][0];
+        if(t === 'object'){
+          // register node for object item
+          const nodeName = singularizeName(path || name+'Item');
+          const itemNode = walkObject(sample[0], nodeName);
+          registerType(path, `array<${itemNode}>`);
+          return `array<${itemNode}>`;
+        } else {
+          registerType(path, `array<${t}>`);
+          return `array<${t}>`;
+        }
+      } else {
+        // mixed array -> array<any>
+        registerType(path, 'array<any>');
+        return 'array<any>';
+      }
+    }
+    if(typeof v === 'object'){
+      const node = walkObject(v, path ? path.split('.').slice(-1)[0] : name);
+      registerType(path, 'object');
+      return 'object';
+    }
+    // primitive
+    const prim = detectPrimitive(v);
+    registerType(path, prim);
+    return prim;
+  }
+
+  function detectPrimitive(val){
+    if(val === null) return 'null';
+    if(Array.isArray(val)) return 'array';
+    if(typeof val === 'string') return 'string';
+    if(typeof val === 'boolean') return 'boolean';
+    if(typeof val === 'number') return isInteger(val) ? 'int' : 'double';
+    return 'any';
+  }
+
+  function registerType(path, t){
+    if(!path) return;
+    ctx.types[path] = ctx.types[path] || new Set();
+    ctx.types[path].add(t);
+  }
+
+  function walkObject(obj, nodeName){
+    const nodeKey = nodeName || 'Root';
+    if(ctx.nodes[nodeKey]) return nodeKey; // already processed (simple guard)
+    const props = {};
+    for(const k of Object.keys(obj)){
+      const fullPath = (nodeKey==='Root'?k: `${nodeKey}.${k}`);
+      const val = obj[k];
+      props[k] = val;
+      walk(val, fullPath);
+    }
+    ctx.nodes[nodeKey] = props;
+    // detect enum candidates for string arrays or fields: collect values if string and few unique
+    for(const k of Object.keys(props)){
+      try {
+        const val = props[k];
+        if(typeof val === 'string'){
+          // store sample set for potential enum detection
+          const enumKey = `${nodeKey}.${k}`;
+          ctx.enums[enumKey] = ctx.enums[enumKey] || new Set();
+          ctx.enums[enumKey].add(val);
+        }
+        if(Array.isArray(val) && val.length>0 && typeof val[0]==='string'){
+          const enumKey = `${nodeKey}.${k}`;
+          ctx.enums[enumKey] = ctx.enums[enumKey] || new Set();
+          val.slice(0,20).forEach(v=>ctx.enums[enumKey].add(v));
+        }
+      } catch(e){}
+    }
+    return nodeKey;
+  }
+
+  walk(value, '');
+  return ctx;
+}
+
+function singularizeName(pathOrName){
+  // naive singularize: remove trailing s if >2 chars
+  const s = pathOrName.replace(/\[.*\]/g,'').split('.').pop();
+  if(s.endsWith('ies')) return capitalize(s.slice(0,-3)+'y');
+  if(s.endsWith('s') && s.length>3) return capitalize(s.slice(0,-1));
+  return capitalize(s);
+}
+
+/* ------------------ generators ------------------ */
+
+function generateSwiftModels(rootName, ctx, options){
+  const { nodes, enums } = ctx;
+  const parts = [];
+  const generated = new Set();
+
+  function typeForValue(val, propPath){
+    if(val === null) return 'String?';
+    if(Array.isArray(val)){
+      if(val.length === 0) return '[String]?';
+      const first = val[0];
+      if(typeof first === 'object') return `[${capitalize(propPath)}Item]?`;
+      // primitive
+      if(typeof first === 'string') return '[String]?';
+      if(typeof first === 'boolean') return '[Bool]?';
+      if(typeof first === 'number') return isInteger(first) ? '[Int]?' : '[Double]?';
+      return '[Any]?';
+    }
+    if(typeof val === 'object') return `${capitalize(propPath)}?`;
+    if(typeof val === 'string'){
+      const enumKey = `${propPath}`;
+      if(options.enumPolicy === 'always' || (options.enumPolicy === 'auto' && enums[enumKey] && enums[enumKey].size>0 && enums[enumKey].size<=8)){
+        return `${capitalize(propPath)}Enum?`;
+      }
+      return 'String?';
+    }
+    if(typeof val === 'boolean') return 'Bool?';
+    if(typeof val === 'number') return isInteger(val) ? 'Int?' : 'Double?';
+    return 'String?';
+  }
+
+  function genNode(nodeName){
+    if(generated.has(nodeName)) return;
+    generated.add(nodeName);
+    const props = nodes[nodeName];
+    if(!props) return;
+    const lines = [];
+    const coding = [];
+    for(const key of Object.keys(props)){
+      const val = props[key];
+      const safeKey = validIdentifier(key) ? key : '`' + key + '`';
+      const type = typeForValue(val, `${nodeName}.${key}`);
+      lines.push(`    let ${camelize(key)}: ${type}`);
+      coding.push(`        case ${camelize(key)} = "${key}"`);
+    }
+    // model
+    parts.push(`// MARK: - ${nodeName}\nstruct ${nodeName}: Codable {`);
+    parts.push(lines.join('\n'));
+    parts.push('\n\n    enum CodingKeys: String, CodingKey {');
+    parts.push(coding.join('\n'));
+    parts.push('    }\n}\n');
+
+    // generate nested nodes & enums
+    for(const key of Object.keys(props)){
+      const val = props[key];
+      if(Array.isArray(val) && val.length>0 && typeof val[0] === 'object'){
+        const childName = capitalize(`${nodeName}${capitalize(key)}Item`);
+        // create node for array item with name childName
+        // ensure nodes[childName] exists: we'll create synthetic node based on first item
+        const sample = val[0];
+        nodes[childName] = sample;
+        genNode(childName);
+      }
+      if(typeof val === 'object' && val !== null){
+        const childName = capitalize(key);
+        // if name collides we'll use `${nodeName}${capitalize(key)}`
+        if(nodes[childName] && nodes[childName] !== val){
+          // create unique
+          const unique = `${nodeName}${capitalize(key)}`;
+          nodes[unique] = val;
+          genNode(unique);
+        } else {
+          nodes[childName] = val;
+          genNode(childName);
+        }
+      }
+      if(typeof val === 'string'){
+        const enumKey = `${nodeName}.${key}`;
+        const set = enums[enumKey];
+        if(set && (options.enumPolicy==='always' || (options.enumPolicy==='auto' && set.size>0 && set.size<=8))){
+          // generate enum
+          const enumName = `${capitalize(nodeName)}${capitalize(key)}Enum`;
+          if(!generated.has(enumName)){
+            generated.add(enumName);
+            const cases = [...set].slice(0,50);
+            const enumLines = cases.map(v=> `    case ${enumCaseName(v)} = "${escapeString(v)}"`);
+            parts.push(`enum ${enumName}: String, Codable {\n${enumLines.join('\n')}\n}\n`);
+          }
+        }
+      }
+    }
+  }
+
+  // root node: create nodes[rootName] if not present
+  if(!ctx.nodes[rootName]){
+    ctx.nodes[rootName] = ctx.nodes['Root'] || Object.assign({}, ...Object.keys(ctx.nodes).map(k=>({})));
+  }
+
+  // make sure root node uses provided rootName mapping
+  // if original was Root, keep nodes; if not, copy
+  if(rootName !== 'Root' && ctx.nodes['Root']){
+    ctx.nodes[rootName] = ctx.nodes['Root'];
+  }
+
+  genNode(rootName);
+  return parts.join('\n');
+}
+
+/* Kotlin generator (data classes + @SerializedName) */
+function generateKotlinModels(rootName, ctx, options){
+  const { nodes, enums } = ctx;
+  const parts = [];
+  const generated = new Set();
+
+  function kotlinType(val, propPath){
+    if(val === null) return 'String?';
+    if(Array.isArray(val)){
+      if(val.length===0) return 'List<String>?';
+      const first = val[0];
+      if(typeof first === 'object') return "List<" + capitalize(propPath) + "Item>?";
+      if(typeof first === 'string') return 'List<String>?';
+      if(typeof first === 'boolean') return 'List<Boolean>?';
+      if(typeof first === 'number') return isInteger(first)? 'List<Int>?' : 'List<Double>?';
+      return 'List<Any>?';
+    }
+    if(typeof val === 'object') return `${capitalize(propPath)}?`;
+    if(typeof val === 'string'){
+      const enumKey = `${propPath}`;
+      if(options.enumPolicy === 'always' || (options.enumPolicy === 'auto' && enums[enumKey] && enums[enumKey].size>0 && enums[enumKey].size<=8)){
+        return `${capitalize(propPath)}Enum?`;
+      }
+      return 'String?';
+    }
+    if(typeof val === 'boolean') return 'Boolean?';
+    if(typeof val === 'number') return isInteger(val)? 'Int?' : 'Double?';
+    return 'String?';
+  }
+
+  function genNode(nodeName){
+    if(generated.has(nodeName)) return;
+    generated.add(nodeName);
+    const props = nodes[nodeName];
+    if(!props) return;
+    const lines = [];
+    for(const key of Object.keys(props)){
+      const val = props[key];
+      const ktType = kotlinType(val, `${nodeName}${capitalize(key)}`);
+      lines.push(`    @com.google.gson.annotations.SerializedName("${key}")\n    val ${camelize(key)}: ${ktType}`);
+    }
+    parts.push(`data class ${nodeName}(\n${lines.join(',\n')}\n)\n`);
+
+    // nested & enums
+    for(const key of Object.keys(props)){
+      const val = props[key];
+      if(Array.isArray(val) && val.length>0 && typeof val[0] === 'object'){
+        const child = `${nodeName}${capitalize(key)}Item`;
+        nodes[child] = val[0];
+        genNode(child);
+      }
+      if(typeof val === 'object' && val !== null){
+        const child = capitalize(key);
+        nodes[child] = val;
+        genNode(child);
+      }
+      if(typeof val === 'string'){
+        const enumKey = `${nodeName}.${key}`;
+        const set = enums[enumKey];
+        if(set && (options.enumPolicy==='always' || (options.enumPolicy==='auto' && set.size>0 && set.size<=8))){
+          const enumName = `${capitalize(nodeName)}${capitalize(key)}Enum`;
+          if(!generated.has(enumName)){
+            generated.add(enumName);
+            const items = [...set].slice(0,50).map(v => `    ${enumCaseName(v)}("${escapeString(v)}")`);
+            parts.push(`enum class ${enumName}(val value: String){\n${items.join(',\n')};\n}\n`);
+          }
+        }
+      }
+    }
+  }
+
+  if(!ctx.nodes[rootName]){
+    if(ctx.nodes['Root']) ctx.nodes[rootName]=ctx.nodes['Root'];
+  }
+  genNode(rootName);
+  return parts.join('\n');
+}
+
+/* Java generator (simple POJO with fields and SerializedName) */
+function generateJavaModels(rootName, ctx, options){
+  const { nodes, enums } = ctx;
+  const parts = [];
+  const generated = new Set();
+
+  function javaType(val, propPath){
+    if(val === null) return 'String';
+    if(Array.isArray(val)){
+      if(val.length===0) return 'List<String>';
+      const first = val[0];
+      if(typeof first === 'object') return `List<${capitalize(propPath)}Item>`;
+      if(typeof first === 'string') return 'List<String>';
+      if(typeof first === 'boolean') return 'List<Boolean>';
+      if(typeof first === 'number') return isInteger(first)? 'List<Integer>' : 'List<Double>';
+      return 'List<Object>';
+    }
+    if(typeof val === 'object') return `${capitalize(propPath)}`;
+    if(typeof val === 'string'){
+      const enumKey = `${propPath}`;
+      if(options.enumPolicy === 'always' || (options.enumPolicy === 'auto' && enums[enumKey] && enums[enumKey].size>0 && enums[enumKey].size<=8)){
+        return `${capitalize(propPath)}Enum`;
+      }
+      return 'String';
+    }
+    if(typeof val === 'boolean') return 'Boolean';
+    if(typeof val === 'number') return isInteger(val)? 'Integer' : 'Double';
+    return 'String';
+  }
+
+  function genNode(nodeName){
+    if(generated.has(nodeName)) return;
+    generated.add(nodeName);
+    const props = nodes[nodeName];
+    if(!props) return;
+    const lines = [];
+    for(const key of Object.keys(props)){
+      const val = props[key];
+      const jt = javaType(val, `${nodeName}${capitalize(key)}`);
+      lines.push(`    @com.google.gson.annotations.SerializedName("${key}")\n    private ${jt} ${camelize(key)};`);
+    }
+    parts.push(`public class ${nodeName} {\n${lines.join('\n\n')}\n}\n`);
+
+    // nested & enums
+    for(const key of Object.keys(props)){
+      const val = props[key];
+      if(Array.isArray(val) && val.length>0 && typeof val[0] === 'object'){
+        const child = `${nodeName}${capitalize(key)}Item`;
+        nodes[child] = val[0];
+        genNode(child);
+      }
+      if(typeof val === 'object' && val !== null){
+        const child = capitalize(key);
+        nodes[child] = val;
+        genNode(child);
+      }
+      if(typeof val==='string'){
+        const enumKey = `${nodeName}.${key}`;
+        const set = enums[enumKey];
+        if(set && (options.enumPolicy==='always' || (options.enumPolicy==='auto' && set.size>0 && set.size<=8))){
+          const enumName = `${capitalize(nodeName)}${capitalize(key)}Enum`;
+          if(!generated.has(enumName)){
+            generated.add(enumName);
+            const cases = [...set].map(v=>`    @com.google.gson.annotations.SerializedName("${escapeString(v)}")\n    ${enumCaseName(v)}("${escapeString(v)}")`);
+            parts.push(`public enum ${enumName} {\n${cases.join(',\n')};\n    private String value;\n    ${enumName}(String v){this.value=v;}\n    public String getValue(){return value;}\n}\n`);
+          }
+        }
+      }
+    }
+  }
+
+  if(!ctx.nodes[rootName] && ctx.nodes['Root']) ctx.nodes[rootName] = ctx.nodes['Root'];
+  genNode(rootName);
+  return parts.join('\n');
+}
+
+/* TypeScript interfaces (lightweight) */
+function generateTS(rootName, ctx, options){
+  const { nodes } = ctx;
+  const parts = [], generated = new Set();
+  function tsType(val, path){
+    if(val === null) return 'string | null';
+    if(Array.isArray(val)){
+      if(val.length===0) return 'string[]';
+      const t = tsType(val[0], path);
+      return `${t.replace(/\s*\|\s*null/g,'')}[]`;
+    }
+    if(typeof val==='object') return `${capitalize(path)}`;
+    if(typeof val==='string') return 'string';
+    if(typeof val==='boolean') return 'boolean';
+    if(typeof val==='number') return 'number';
+    return 'any';
+  }
+  function gen(nodeName){
+    if(generated.has(nodeName)) return;
+    generated.add(nodeName);
+    const props = nodes[nodeName];
+    if(!props) return;
+    const lines = [];
+    for(const k of Object.keys(props)){
+      lines.push(`  ${camelize(k)}?: ${tsType(props[k], `${nodeName}${capitalize(k)}`)};`);
+    }
+    parts.push(`export interface ${nodeName} {\n${lines.join('\n')}\n}\n`);
+    for(const k of Object.keys(props)){
+      if(Array.isArray(props[k]) && props[k].length>0 && typeof props[k][0]==='object'){
+        const child = `${nodeName}${capitalize(k)}Item`;
+        nodes[child] = props[k][0]; gen(child);
+      }
+      if(typeof props[k]==='object' && props[k]!==null){
+        const child = capitalize(k); nodes[child]=props[k]; gen(child);
+      }
+    }
+  }
+  if(!ctx.nodes[rootName] && ctx.nodes['Root']) ctx.nodes[rootName]=ctx.nodes['Root'];
+  gen(rootName);
+  return parts.join('\n');
+}
+
+/* small helpers */
+function enumCaseName(v){
+  // convert string to safe enum case
+  const s = String(v).trim();
+  if(s==='') return 'empty';
+  let out = s.replace(/[^A-Za-z0-9]+/g,'_').replace(/^[^A-Za-z]+/,'').toUpperCase();
+  if(/^[0-9]/.test(out)) out = '_' + out;
+  if(out==='') out = 'VALUE';
+  return out;
+}
+function escapeString(s){ return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"'); }
+
+/* ------------------ orchestrator ------------------ */
+
+function generate(){
+  const raw = document.getElementById('jsonInput').value.trim();
+  const rootName = document.getElementById('rootName').value || 'Root';
+  const enumPolicy = document.getElementById('enumPolicy').value;
+  const optionalByDefault = document.getElementById('optionalByDefault').checked;
+
+  document.getElementById('optEnum').textContent = enumPolicy;
+  document.getElementById('optOptional').textContent = optionalByDefault;
+
+  if(!raw){
+    document.getElementById('codeOutput').textContent = 'Please paste JSON sample on the left and press Generate.';
+    return;
+  }
+  let parsed;
+  try{
+    parsed = JSON.parse(raw);
+  } catch(e){
+    document.getElementById('codeOutput').textContent = '❌ Invalid JSON: ' + e.message;
+    return;
+  }
+
+  // analyze
+  const ctx = analyzeJSON(parsed);
+  // set root node if parsed is an array at top-level
+  if(Array.isArray(parsed)){
+    // top-level array: create synthetic Root node with single prop items
+    ctx.nodes['Root'] = { items: parsed };
+  } else if(typeof parsed === 'object'){
+    // if JSON top-level is object, ensure ctx.nodes.Root holds it
+    if(!ctx.nodes['Root']){
+      ctx.nodes['Root'] = parsed;
+      // walk nodes to populate types/enums properly
+      analyzeJSON(parsed, 'Root', ctx);
+    }
+  } else {
+    // primitives top-level -> wrap
+    ctx.nodes['Root'] = { value: parsed };
+  }
+
+  // prepare options
+  const options = { enumPolicy, optionalByDefault };
+
+  // generate based on selected language
+  let code = '';
+  if(state.lang === 'swift'){
+    code = swiftHeader() + '\n' + generateSwiftModels(rootName, ctx, options);
+  } else if(state.lang === 'kotlin'){
+    code = kotlinHeader() + '\n' + generateKotlinModels(rootName, ctx, options);
+  } else if(state.lang === 'java'){
+    code = javaHeader() + '\n' + generateJavaModels(rootName, ctx, options);
+  } else {
+    code = generateTS(rootName, ctx, options);
+  }
+
+  document.getElementById('codeOutput').textContent = code;
+
+  // keys & types preview
+  document.getElementById('keys').textContent = ctx.keys.length ? ctx.keys.join('\n') : '—';
+  const typeLines = Object.entries(ctx.types).slice(0,200).map(([k,s]) => `${k || '<root>'} → ${[...s].join('|')}`);
+  document.getElementById('types').textContent = typeLines.join('\n') || '—';
+  document.getElementById('metaRoot').textContent = `${rootName}`;
+}
+
+/* header helpers */
+function swiftHeader(){
+  return `// Generated by QuickType-style tool
+// Swift 5 Codable models
+import Foundation\n`;
+}
+function kotlinHeader(){
+  return `// Generated by QuickType-style tool
+// Kotlin data classes (Gson SerializedName used in examples)\n`;
+}
+function javaHeader(){
+  return `// Generated by QuickType-style tool
+// Java POJOs (Gson SerializedName used in examples)\n`;
+}
+
+/* ------------------ init ------------------ */
+(function initSample(){
+  const sample = `{
+  "status": true,
+  "message": "Success",
+  "data": {
+    "currentPage": 1,
+    "orders": [
+      {
+        "orderId": 1001,
+        "amount": 1500.5,
+        "currency": "PKR",
+        "status": "DELIVERED",
+        "items": [
+          {"itemId": 1, "name": "Burger", "price": "200"},
+          {"itemId": 2, "name": "Fries", "price": "100"}
+        ],
+        "meta": {
+          "deliveredAt": "2025-12-04T10:00:00Z",
+          "tags": ["fastfood","promo"]
+        }
+      }
+    ]
+  }
+}`;
+  document.getElementById('jsonInput').value = sample;
+  generate();
+})();
+</script>
+</body>
+</html>
